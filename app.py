@@ -4,6 +4,24 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+from deep_translator import GoogleTranslator
+
+# ==============================================================================
+# 中英名稱對照表 (常用/預設熱門股票)
+# ==============================================================================
+STOCK_NAME_CN = {
+    '2330.TW': '台積電',
+    'AAPL': '蘋果',
+    '005930.KS': '三星電子',
+    'SONY': '索尼',
+    '090430.KS': '愛茉莉太平洋',
+    'EL': '雅詩蘭黛',
+    'LYV': 'Live Nation',
+    'SPOT': 'Spotify',
+    'SBUX': '星巴克',
+    'KO': '可口可樂',
+    'NKE': 'Nike'
+}
 
 # ==============================================================================
 # 1. 網頁基礎設定與視覺美化 (CSS)
@@ -233,7 +251,7 @@ selected_symbol_input = st.sidebar.text_input(
 )
 selected_symbol = selected_symbol_input.strip().upper()
 
-st.sidebar.caption("💡 提示：輸入完成後，請按下 Enter 進行分析。")
+st.sidebar.caption("💡 提示：輸入完成後，請按下 Enter 進行分析（支援代號例如：2330.TW, AAPL, 005930.KS）。目前系統已內建部分熱門股票之中英對照。")
 
 # 4.2 技術指標動態控制
 st.sidebar.markdown("---")
@@ -305,11 +323,27 @@ if df.empty:
 # ==============================================================================
 # 5. 基本資料與財務指標提取 (主標題)
 # ==============================================================================
-company_name = info.get('longName', selected_symbol)
+# 檢查是否在中文對照表中，若無則透過 GoogleTranslator 自動翻譯並動態快取
+if selected_symbol in STOCK_NAME_CN:
+    company_name = STOCK_NAME_CN[selected_symbol]
+else:
+    raw_name = info.get('shortName', info.get('longName', selected_symbol))
+    if raw_name and raw_name != selected_symbol:
+        try:
+            # 自動將英文或外國名稱翻譯成繁體中文
+            translated_name = GoogleTranslator(source='auto', target='zh-TW').translate(raw_name)
+            # 動態寫入快取對照表中，避免重複打 API
+            STOCK_NAME_CN[selected_symbol] = translated_name
+            company_name = translated_name
+        except Exception:
+            # 翻譯出錯時 fallback 回原始英文名稱
+            company_name = raw_name
+    else:
+        company_name = raw_name
 
 st.markdown(f"""
 <div class="title-container">
-    <h1 class="main-title">{company_name} 股票分析與財報體質評估</h1>
+    <h1 class="main-title">{company_name} ({selected_symbol}) 股票分析與財報體質評估</h1>
     <div class="sub-title">代號：{selected_symbol} | 當前市場走勢與基本面健康度評分</div>
 </div>
 """, unsafe_allow_html=True)
